@@ -1,16 +1,12 @@
-#include "../include/main.h"
+#include "../include/DES.h"
+#include "../include/attaque.h"
 
-int main(int argc, char const *argv[])
-{
-	uint64_t message = 0x566d4536ed24513f;
+int main(int argc, char const *argv[]) {
+	uint32_t test = 0xa6a6a6a6;
 
-	uint64_t K = 0xab3443644698a2f2;
+	struct attaque attaque = initialisation_attaque();
 
-	printf("\nmessage = %lx\n", message);
-	printf("\nK = %lx\n", K);
+	recherche_K_16(attaque);
 
-	message = chiffrement_DES(message, K);
-
-	printf("\nchiffré = %lx\n", message);
 
 }

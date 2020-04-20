@@ -1,4 +1,4 @@
-#include "../include/fonction_DES.h"
+#include "../include/DES.h"
 
 // Table de permutation de IP
 int table_ip[TAILLE_TABLE_IP] = {
@@ -32,19 +32,6 @@ int table_pc1[TAILLE_TABLE_PC1] = {
 7, 62, 54, 46, 38, 30, 22,
 14, 6, 61, 53, 45, 37, 29,
 21, 13, 5, 28, 20, 12, 4};
-
-// Table de permutation inverse de PC1
-// (On met à 1 la position des 8 bits inconnus car ils seront determinés plus tard)
-int table_pc1_inv[TAILLE_TABLE_PC1_INV] = {
-8, 16, 24, 56, 52, 44, 36, 1,
-7, 15, 23, 55, 51, 43, 35, 1,
-6, 14, 22, 54, 50, 42, 34, 1,
-5, 13, 21, 53, 49, 41, 33, 1,
-4, 12, 20, 28, 48, 40, 32, 1,
-3, 11, 19, 27, 47, 39, 31, 1,
-2, 10, 18, 26, 46, 38, 30, 1,
-1, 9, 17, 25, 45, 37, 29, 1};
-
 
 // Table de permutation/extraction de PC2
 int table_pc2[TAILLE_TABLE_PC2] = {
@@ -138,27 +125,6 @@ uint64_t permutation(uint64_t source, int *table, int taille_table, int taille_e
 		resultat <<= 1;
 		if(source & (uint64_1<<(taille_entree-table[i])))
 			resultat |= 1;
-	}
-	return resultat;
-}
-
-uint64_t permutation_pc1_inv(uint64_t source) {
-	uint64_t resultat=0;
-	uint64_t uint64_1 = 1;
-	int bit_a_1 = 0;
-	for (int i = 0; i < TAILLE_TABLE_PC1_INV; i++) {
-		resultat <<= 1;
-		// Cette condition est véifié tous les 8 bits et applique un bit de parité.
-		if((i+1)%8 == 0) {
-			if(bit_a_1%2 == 0)
-				resultat |= 1;
-			bit_a_1 = 0;
-		}
-		// Sinon on définit le bit de la même manière que la fonction précédente.
-		else if(source & (uint64_1<<(TAILLE_TABLE_PC1 - table_pc1_inv[i]))) {
-			resultat |= 1;
-			bit_a_1++;
-		}
 	}
 	return resultat;
 }
@@ -300,6 +266,47 @@ uint64_t chiffrement_DES(uint64_t message, uint64_t K) {
 
 	// Dernier tour un peu different
 	L = L ^ fonction_F(R, k[15]);
+
+	// Concatenation de L et R
+	resultat = L;
+	resultat = (resultat<<32) | R;
+
+	// Passage dans IP⁻¹
+	resultat = permutation(resultat, table_ip_inv, TAILLE_TABLE_IP, 64);
+
+	return resultat;
+}
+
+uint64_t dechiffrement_DES(uint64_t chiffre, uint64_t K) {
+	uint64_t resultat = 0;
+	// Variable qui permettra de sauvegarder temporairement la valeur de L;
+	uint32_t L_tmp = 0;
+	// Partie gauche et droite du message
+	uint32_t L = 0;
+	uint32_t R = 0;
+	// Sous-clés de K
+	uint64_t k[16] = {
+	0, 0, 0, 0, 0, 0, 0, 0,
+	0, 0, 0, 0, 0, 0, 0, 0};
+
+	// Génération des sous clés
+	generation_sous_cles(K, k);
+	// Passage dans IP
+	chiffre = permutation(chiffre, table_ip, TAILLE_TABLE_IP, 64);
+
+	// Séparation en 2 de message
+	L = chiffre>>32;
+	R = chiffre & 0x00000000ffffffff;
+
+	// Boucle principale du shéma de Festel
+	for (int i =15; i > 0; --i) {
+		L_tmp = L;
+		L = R;
+		R = fonction_F(R, k[i]) ^ L_tmp;
+	}
+
+	// Dernier tour un peu different
+	L = L ^ fonction_F(R, k[0]);
 
 	// Concatenation de L et R
 	resultat = L;

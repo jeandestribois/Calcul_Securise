@@ -25,7 +25,7 @@ $(BUILDDIR)/%.o: $(SOURCESDIR)/%.c
 	mkdir -p $(BUILDDIR)
 	$(CC) -c $< -o $@ $(CFLAGS)
 
-# EDITION:
+# EDITEUR:
 subl:
 	subl $(SOURCES)
 	subl include/*.h
