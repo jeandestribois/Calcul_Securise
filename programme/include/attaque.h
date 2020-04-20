@@ -56,11 +56,18 @@ struct liste *liberation_memoire(struct liste* l);
 // Fonction rajoutant un élément dans la lites de partie de clés possible
 struct liste *nouvel_element_liste(struct liste *l, uint8_t val);
 
+// Fonction parcourant la liste et renvoyant 1 si un certain élément est présent dans la liste
+// et 0 sinon
+int element_present(struct liste *l, uint8_t val);
+
 // Cette fonction cherche pour un chiffré fauté toutes les parties de clés
 // possibles pour chaques S-Boxs
 void recherche_s_box(struct liste *k_partie[8], uint64_t R_15_exp, uint64_t R_15_f_exp, uint32_t L16_xor_L16_f, uint64_t e_exp);
 
 // Fonction effectuant la recherche de K16
 uint64_t recherche_K_16(struct attaque attaque);
+
+// Fonction effectuant la recherche de K à partir de K16
+uint64_t recherche_K(struct attaque attaque, uint64_t K_16);
 
 #endif

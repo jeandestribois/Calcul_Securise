@@ -108,6 +108,14 @@ struct attaque initialisation_attaque() {
 	return attaque;
 }
 
+struct liste *liberation_memoire(struct liste* l) {
+	if(l != NULL) {
+		l->suiv = liberation_memoire(l->suiv);
+		free(l);
+	}
+	return NULL;
+}
+
 struct liste *nouvel_element_liste(struct liste *l, uint8_t val) {
 	struct liste *elem = malloc(sizeof(struct liste));
 	elem->val = val;
@@ -115,12 +123,13 @@ struct liste *nouvel_element_liste(struct liste *l, uint8_t val) {
 	return elem;
 }
 
-struct liste *liberation_memoire(struct liste* l) {
-	if(l != NULL) {
-		l->suiv = liberation_memoire(l->suiv);
-		free(l);
+int element_present(struct liste *l, uint8_t val) {
+	struct liste *parcours = l;
+	while(parcours != NULL) {
+		if(parcours->val == val) return 1;
+		parcours = parcours->suiv;
 	}
-	return NULL;
+	return 0;
 }
 
 void recherche_s_box(struct liste *k_partie[8], uint64_t R_15_exp, uint64_t R_15_f_exp, uint32_t L16_xor_L16_f, uint64_t e_exp) {
@@ -211,6 +220,7 @@ void recherche_s_box(struct liste *k_partie[8], uint64_t R_15_exp, uint64_t R_15
 }
 
 uint64_t recherche_K_16(struct attaque attaque) {
+	uint64_t resultat = 0;
 	// Variable qui stockera la valeur de L16 XOR L16' (puis P-1(L16 XOR L16'))
 	uint32_t L16_xor_L16_f = 0;
 	// Variable stockant les parties de K16 qui fonctionnent pour un certain chiffré fauté
@@ -222,8 +232,9 @@ uint64_t recherche_K_16(struct attaque attaque) {
 	uint64_t R_15_exp = permutation(attaque.R_15, table_e, TAILLE_TABLE_E, 32);
 	// Varibale stockant l'expansion E(R_15_f)
 	uint64_t R_15_f_exp = 0;
-	// Variable qui sera utile pour parcourir la liste de partie de clé
-	struct liste *parcours;
+	// Variables qui seront utiles pour la selection de la bonne partie de clé pour chaque S-Box
+	int present = 0;
+	int trouve = 0;
 
 	// Initialisation du tableau de liste k_partie
 	for (int i = 0; i < NOMBRE_CHIFFRES_FAUTES; ++i)
@@ -243,17 +254,57 @@ uint64_t recherche_K_16(struct attaque attaque) {
 		recherche_s_box(k_partie[i], R_15_exp, R_15_f_exp, L16_xor_L16_f, e_exp);
 	}
 
-	for (int i = 0; i < NOMBRE_CHIFFRES_FAUTES; ++i) {
-		printf("E(e[i]) = %lx\n", permutation(attaque.e[i], table_e, TAILLE_TABLE_E, 32));
-		for (int j = 0; j < 8; ++j) {
-			parcours = k_partie[i][j];
-			while(parcours != NULL) {
-				printf("k_partie[%d][%d] = %x\n", i, j, parcours->val);
-				parcours = parcours->suiv;
+	// On selectionne les parties de clé possible
+	// Pour chaque S-Box
+	for(int i = 0; i < 8; ++i) {
+		trouve = 0;
+		for(uint8_t k = 0; k < 64 && !trouve; k++) {
+			present = 1;
+			for(int j = 0; j<NOMBRE_CHIFFRES_FAUTES && present; j++) {
+				// Si k n'est pas dans la liste de la S-box i du chiffré j 
+				if(k_partie[j][i] != NULL && !element_present(k_partie[j][i], k))
+					present = 0;
 			}
-			k_partie[i][j] = liberation_memoire(k_partie[i][j]);
+			// Si k est présent c'est que c'est la bonne partie de clé.
+			if(present) {
+				resultat = (resultat<<6) | k;
+				trouve = 1;
+			}
 		}
 	}
 
-	return 0;
+	return resultat;
 }
+
+uint64_t recherche_K(struct attaque attaque, uint64_t K_16) {
+	// Cette variable stockant la clé DES qu'on teste.
+	uint64_t K = 0;
+	// Variable stockant PC2(K_16)
+	uint64_t K_16_pc2 = 0;
+	// Variable servant à modifier la variable recherche sur certain bits.
+	uint64_t modification = 0;
+	// Variable qui indiquera si la clé a été trouvé ou pas
+	int trouve = 0;
+	
+	// On applique la permutation inverse de PC2
+	// le resultat ne sera pas juste pour 8 bits (aux positions 9, 18, 22, 25, 35, 38, 43, 54)
+	K_16_pc2 = permutation(K_16, table_pc2_inv, TAILLE_TABLE_PC2_INV, 48);
+	// On teste les 256 possibilités
+	for (uint64_t i = 0; i < 256 && !trouve; ++i) {
+		// On prepare la modification des bits inconnus
+		modification = ((i & 0x0000000000000080) << 40);
+		modification |= ((i & 0x0000000000000040) << 32);
+		modification |= ((i & 0x0000000000000020) << 29);
+		modification |= ((i & 0x0000000000000010) << 27);
+		modification |= ((i & 0x0000000000000008) << 18);
+		modification |= ((i & 0x0000000000000004) << 16);
+		modification |= ((i & 0x0000000000000002) << 12);
+		modification |= ((i & 0x0000000000000001) << 2);
+
+		// On applique la permutation inverse de PC1 sur recherche modifié;
+		K = permutation(K_16_pc2 & ~modification, table_pc1_inv, TAILLE_TABLE_PC1_INV, 56);
+		if(chiffrement_DES(attaque.message, K) == attaque.chiffre) trouve = 1;
+	}
+
+	return K;
+} 

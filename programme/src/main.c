@@ -2,11 +2,11 @@
 #include "../include/attaque.h"
 
 int main(int argc, char const *argv[]) {
-	uint32_t test = 0xa6a6a6a6;
 
 	struct attaque attaque = initialisation_attaque();
 
-	recherche_K_16(attaque);
+	uint64_t K = recherche_K(attaque, recherche_K_16(attaque));
 
+	printf("K = %lx\n", K);
 
 }
