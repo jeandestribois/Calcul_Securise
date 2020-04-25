@@ -1,5 +1,5 @@
-#ifndef DES
-#define DES
+#ifndef DES_H
+#define DES_H
 
 #include <stdio.h>
 #include <stdlib.h>
